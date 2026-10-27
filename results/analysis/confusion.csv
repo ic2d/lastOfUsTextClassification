@@ -1,0 +1,17 @@
+dataset,setup,true,pred,count
+user_reviews_g1,ROBERTA_GNB,0,0,89.7
+user_reviews_g1,ROBERTA_GNB,0,1,7.3
+user_reviews_g1,ROBERTA_GNB,1,0,137.9
+user_reviews_g1,ROBERTA_GNB,1,1,1858.1
+user_reviews_g1,ROBERTA_SVM,0,0,58.8
+user_reviews_g1,ROBERTA_SVM,0,1,38.2
+user_reviews_g1,ROBERTA_SVM,1,0,45.4
+user_reviews_g1,ROBERTA_SVM,1,1,1950.6
+user_reviews_g2,ROBERTA_SVM,0,0,12078.2
+user_reviews_g2,ROBERTA_SVM,0,1,721.8
+user_reviews_g2,ROBERTA_SVM,1,0,790.4
+user_reviews_g2,ROBERTA_SVM,1,1,9797.6
+user_reviews_g2,TFIDF_MNB,0,0,12025.3
+user_reviews_g2,TFIDF_MNB,0,1,774.7
+user_reviews_g2,TFIDF_MNB,1,0,864.0
+user_reviews_g2,TFIDF_MNB,1,1,9724.0
