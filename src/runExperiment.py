@@ -13,7 +13,7 @@ from sklearn.metrics import (accuracy_score, balanced_accuracy_score, f1_score,
 # -------------------------------
 
 from sklearn.ensemble import RandomForestClassifier
-from sklearn.naive_bayes import GaussianNB, MultinomialNB
+from sklearn.naive_bayes import GaussianNB
 from sklearn.neighbors import KNeighborsClassifier
 from sklearn.tree import DecisionTreeClassifier
 from sklearn.svm import LinearSVC
@@ -39,8 +39,6 @@ def get_classifier(algorithm, seed):
             return DecisionTreeClassifier(random_state=seed)
         case "RF":
             return RandomForestClassifier(random_state=seed, n_jobs=1)
-        case "MNB":
-            return MultinomialNB()
         case "GNB":
             return GaussianNB()
         case "SVM":

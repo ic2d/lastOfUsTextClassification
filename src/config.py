@@ -5,10 +5,10 @@ VALID_DATASETS = ["user_reviews_g1", "user_reviews_g2"]
 
 VALID_FEATURES = ["TFIDF", "BOW", "WESG", "WECBOW", "ROBERTA"]
 
-VALID_ALGORITHMS = ["KNN", "DT", "RF", "MNB", "GNB", "SVM"]
+VALID_ALGORITHMS = ["KNN", "DT", "RF", "GNB", "SVM"]
 
-# Multinomial NB requires non-negative inputs, so it only runs on count-based features
-INVALID_SETUPS = [("WESG", "MNB"), ("WECBOW", "MNB"), ("ROBERTA", "MNB")]
+# (feature, algorithm) pairs that cannot be combined (none with the current grid)
+INVALID_SETUPS = []
 
 SEEDS = list(range(1, 11))
 N_FOLDS = 10

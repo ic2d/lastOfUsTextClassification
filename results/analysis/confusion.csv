@@ -11,7 +11,7 @@ user_reviews_g2,ROBERTA_SVM,0,0,12078.2
 user_reviews_g2,ROBERTA_SVM,0,1,721.8
 user_reviews_g2,ROBERTA_SVM,1,0,790.4
 user_reviews_g2,ROBERTA_SVM,1,1,9797.6
-user_reviews_g2,TFIDF_MNB,0,0,12025.3
-user_reviews_g2,TFIDF_MNB,0,1,774.7
-user_reviews_g2,TFIDF_MNB,1,0,864.0
-user_reviews_g2,TFIDF_MNB,1,1,9724.0
+user_reviews_g2,TFIDF_SVM,0,0,11973.7
+user_reviews_g2,TFIDF_SVM,0,1,826.3
+user_reviews_g2,TFIDF_SVM,1,0,872.2
+user_reviews_g2,TFIDF_SVM,1,1,9715.8
