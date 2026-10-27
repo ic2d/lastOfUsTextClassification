@@ -1,39 +1,49 @@
-import string
-
-# -------------------------------
-# download nltk corpus (first time only)
-# -------------------------------
-
-import nltk 
-nltk.download('all')
+import nltk
 
 from nltk.corpus import stopwords
 from nltk.tokenize import word_tokenize
 from nltk.stem import WordNetLemmatizer
 
 # -------------------------------
+# download nltk resources (first time only)
+# -------------------------------
+
+for resource in ["punkt", "punkt_tab", "stopwords", "wordnet", "omw-1.4"]:
+    nltk.download(resource, quiet=True)
+
+# -------------------------------
+# Stopwords: NLTK English list without negations, which carry sentiment
+# ("not good" must not become "good")
+# -------------------------------
+
+NEGATIONS = {
+    "no", "nor", "not", "don", "don't", "ain", "aren", "aren't", "couldn", "couldn't",
+    "didn", "didn't", "doesn", "doesn't", "hadn", "hadn't", "hasn", "hasn't", "haven",
+    "haven't", "isn", "isn't", "mightn", "mightn't", "mustn", "mustn't", "needn",
+    "needn't", "shan", "shan't", "shouldn", "shouldn't", "wasn", "wasn't", "weren",
+    "weren't", "won", "won't", "wouldn", "wouldn't", "but", "against", "very", "too",
+}
+
+STOPWORDS = set(stopwords.words("english")) - NEGATIONS
+
+LEMMATIZER = WordNetLemmatizer()
+
+# -------------------------------
 # Preprocessing Text
 # -------------------------------
 
 def preprocess_text(text):
-    # Tokenize the text
-    tokens = word_tokenize(text.lower())
-    # Remove stop words
-    filtered_tokens = [token for token in tokens if token not in stopwords.words('english')]
+    # Tokenize the lowercased text ("didn't" -> "did", "n't")
+    tokens = word_tokenize(str(text).lower())
+    # Map the clitic negation to a full word
+    tokens = ["not" if token == "n't" else token for token in tokens]
+    # Keep alphabetic tokens only (drops punctuation, numbers and symbols)
+    tokens = [token for token in tokens if token.isalpha()]
+    # Remove stop words (negations are kept)
+    tokens = [token for token in tokens if token not in STOPWORDS]
     # Lemmatize the tokens
-    lemmatizer = WordNetLemmatizer()
-    lemmatized_tokens = [lemmatizer.lemmatize(token) for token in filtered_tokens]
-    # Join the tokens back into a string
-    processed_text = ' '.join(lemmatized_tokens)
-    return processed_text
-
-# -------------------------------
-# Remove Punctuation
-# -------------------------------
-
-def removePunctuation(text):
-    new_text = text.translate(str.maketrans('', '', string.punctuation))
-    return (new_text)
+    tokens = [LEMMATIZER.lemmatize(token) for token in tokens]
+    return " ".join(tokens)
 
 # -------------------------------
 # -------------------------------

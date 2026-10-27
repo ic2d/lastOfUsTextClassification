@@ -1,119 +1,61 @@
+import numpy as np
 
+from sklearn.base import BaseEstimator, TransformerMixin
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.feature_extraction.text import CountVectorizer
 from gensim.models import Word2Vec
-from scipy import sparse
-from os import path
-import numpy as np
-import sys
+
+import src.config as config
 
 # -------------------------------
-# Return TFIDF Features
+# Word2Vec document embeddings (mean pooling of word vectors).
+# Implemented as a scikit-learn transformer so that the embedding model is
+# trained on the training folds only, inside the cross-validation.
 # -------------------------------
 
-def get_TFIDF_features(data, dataset_name:str=None):
-    feature_file = "features/tfidf_" + dataset_name + ".npz"
-    # checks if feature file exists
-    if(path.exists(feature_file)):
-        print("- Getting features from file")
-        X = sparse.load_npz(feature_file)
-    else:
-        print(" - Extracting TFIDF Features")
-        corpus = data['reviewText']
-        vectorizer = TfidfVectorizer()
-        X = vectorizer.fit_transform(corpus)
-        if dataset_name:
-            try:
-                print(" - Saving TFIDF Features to file")
-                sparse.save_npz(feature_file, X)
-            except Exception as e:
-                print(" - File not saved: " + e)
-    return(X)
+class Word2VecVectorizer(BaseEstimator, TransformerMixin):
 
-# -------------------------------
-# Return BOW Features
-# -------------------------------
+    def __init__(self, sg=0, vector_size=100, window=5, min_count=2, seed=1):
+        self.sg = sg
+        self.vector_size = vector_size
+        self.window = window
+        self.min_count = min_count
+        self.seed = seed
 
-def get_BOW_features(data, dataset_name: str = None):
-    feature_file = "features/bow_" + dataset_name + ".npz"
-    # Checks if feature file exists
-    if path.exists(feature_file):
-        print("- Getting features from file")
-        X = sparse.load_npz(feature_file)
-    else:
-        print(" - Extracting BOW Features")
-        corpus = data['reviewText']
-        vectorizer = CountVectorizer()
-        X = vectorizer.fit_transform(corpus)
-        if dataset_name:
-            try:
-                print(" - Saving BOW Features to file")
-                sparse.save_npz(feature_file, X)
-            except Exception as e:
-                print(" - File not saved: " + str(e))
-    return X
+    def fit(self, X, y=None):
+        corpus = [text.split() for text in X]
+        # a single worker makes the training deterministic for a given seed
+        self.model_ = Word2Vec(corpus, vector_size=self.vector_size, window=self.window,
+                               min_count=self.min_count, sg=self.sg, seed=self.seed, workers=1)
+        return self
 
-# -------------------------------
-# Return Word Embedding Skip-Gram Features
-# -------------------------------
-
-def get_WESG_features(data, dataset_name: str = None, vector_size: int = 100, window: int = 5, min_count: int = 1):
-    feature_file = "features/wesg_" + dataset_name + ".npz"
-    # Checks if feature file exists
-    if path.exists(feature_file):
-        print("- Getting features from file")
-        X = sparse.load_npz(feature_file)
-    else:
-        print(" - Extracting Word Embedding Skip-gram Features")
-        corpus = [text.split() for text in data['reviewText']]  
-        model = Word2Vec(corpus, vector_size=vector_size, window=window, min_count=min_count, sg=1, workers=4)
-        embeddings = []
-        for doc in corpus:
-            words = [model.wv[word] for word in doc if word in model.wv]
+    def transform(self, X):
+        embeddings = np.zeros((len(X), self.vector_size), dtype=np.float32)
+        for i, text in enumerate(X):
+            words = [self.model_.wv[word] for word in text.split() if word in self.model_.wv]
             if words:
-                avg_embedding = np.mean(words, axis=0)
-            else:
-                avg_embedding = np.zeros(vector_size)  
-            embeddings.append(avg_embedding)
-        X = sparse.csr_matrix(embeddings)
-        if dataset_name:
-            try:
-                print(" - Saving Word Embedding Skip-gram Features to file")
-                sparse.save_npz(feature_file, X)
-            except Exception as e:
-                print(" - File not saved: " + str(e))
-    return X
+                embeddings[i] = np.mean(words, axis=0)
+        return embeddings
 
 # -------------------------------
-# Return Word Embedding Continuous BOW Features
+# Return the (unfitted) feature extractor
 # -------------------------------
 
-def get_WECBOW_features(data, dataset_name: str = None, vector_size: int = 100, window: int = 5, min_count: int = 1):
-    feature_file = "features/wecbow_" + dataset_name + ".npz"
-    # Checks if feature file exists
-    if path.exists(feature_file):
-        print("- Getting features from file")
-        X = sparse.load_npz(feature_file)
-    else:
-        print(" - Extracting Word Embedding CBOW Features")
-        corpus = [text.split() for text in data['reviewText']]  
-        model = Word2Vec(corpus, vector_size=vector_size, window=window, min_count=min_count, workers=4)
-        embeddings = []
-        for doc in corpus:
-            words = [model.wv[word] for word in doc if word in model.wv]
-            if words:
-                avg_embedding = np.mean(words, axis=0)
-            else:
-                avg_embedding = np.zeros(vector_size)  
-            embeddings.append(avg_embedding)
-        X = sparse.csr_matrix(embeddings)
-        if dataset_name:
-            try:
-                print(" - Saving Word Embedding CBOW Features to file")
-                sparse.save_npz(feature_file, X)
-            except Exception as e:
-                print(" - File not saved: " + str(e))
-    return X
+def get_feature_extractor(featureExtract, seed):
+    match featureExtract:
+        case "BOW":
+            return CountVectorizer(ngram_range=config.NGRAM_RANGE, min_df=config.MIN_DF,
+                                   max_features=config.MAX_FEATURES)
+        case "TFIDF":
+            return TfidfVectorizer(ngram_range=config.NGRAM_RANGE, min_df=config.MIN_DF,
+                                   max_features=config.MAX_FEATURES)
+        case "WESG":
+            return Word2VecVectorizer(sg=1, vector_size=config.EMBEDDING_SIZE, window=config.EMBEDDING_WINDOW,
+                                      min_count=config.EMBEDDING_MIN_COUNT, seed=seed)
+        case "WECBOW":
+            return Word2VecVectorizer(sg=0, vector_size=config.EMBEDDING_SIZE, window=config.EMBEDDING_WINDOW,
+                                      min_count=config.EMBEDDING_MIN_COUNT, seed=seed)
+    raise ValueError("Invalid feature: " + featureExtract)
 
 # -------------------------------
 # -------------------------------
