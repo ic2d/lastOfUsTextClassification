@@ -9,13 +9,14 @@ import src.config as config
 from src.dataset import load_dataset
 from src.runExperiment import runLexiconBaselines, runPretrainedBaseline
 from src.pretrained import get_roberta_embeddings
-from main import run_setup
+from main import output_dir, parse_options, run_setup
 
 # -------------------------------
-# Usage: generalSetup.py [n_workers]
+# Usage: generalSetup.py [n_workers] [tuned] [TEXTBLOB|VADER]
 # -------------------------------
 
 N_WORKERS = int(sys.argv[1]) if len(sys.argv) > 1 else max(1, os.cpu_count() - 2)
+OPTIONS = parse_options(sys.argv[2:])
 
 # -------------------------------
 # Run a single job (ML experiment), returning the error message if it fails
@@ -23,7 +24,7 @@ N_WORKERS = int(sys.argv[1]) if len(sys.argv) > 1 else max(1, os.cpu_count() - 2
 
 def runJob(dataset, feature, algorithm, seed):
     try:
-        run_setup(dataset, feature, algorithm, seed)
+        run_setup(dataset, feature, algorithm, seed, **OPTIONS)
         return None
     except Exception:
         return traceback.format_exc()
@@ -47,8 +48,9 @@ if __name__ == "__main__":
                 if not os.path.exists(baseline_file):
                     run(dataset, seed).to_csv(baseline_file, index=False)
 
+    seeds = config.TUNING_SEEDS if OPTIONS["tuned"] else config.SEEDS
     setups = [(d, f, a, s) for d, f, a, s in itertools.product(config.VALID_DATASETS, config.VALID_FEATURES,
-                                                                 config.VALID_ALGORITHMS, config.SEEDS)
+                                                                 config.VALID_ALGORITHMS, seeds)
               if (f, a) not in config.INVALID_SETUPS]
     print(f"{len(setups)} setups, {N_WORKERS} workers")
 
@@ -65,8 +67,9 @@ if __name__ == "__main__":
                 print(f"[{done}/{len(setups)}] done {setup}", flush=True)
 
     if failed:
-        pd.DataFrame(failed, columns=["dataset", "feature", "algorithm", "seed"]).to_csv("results/failed.csv", index=False)
-        print(f"{len(failed)} setups failed; see results/failed.csv")
+        failed_file = output_dir(**OPTIONS) + "failed.csv"
+        pd.DataFrame(failed, columns=["dataset", "feature", "algorithm", "seed"]).to_csv(failed_file, index=False)
+        print(f"{len(failed)} setups failed; see " + failed_file)
     else:
         print("All setups completed")
 

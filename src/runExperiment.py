@@ -13,7 +13,7 @@ from sklearn.metrics import (accuracy_score, balanced_accuracy_score, f1_score,
 # -------------------------------
 
 from sklearn.ensemble import RandomForestClassifier
-from sklearn.naive_bayes import GaussianNB, MultinomialNB
+from sklearn.naive_bayes import GaussianNB
 from sklearn.neighbors import KNeighborsClassifier
 from sklearn.tree import DecisionTreeClassifier
 from sklearn.svm import LinearSVC
@@ -39,8 +39,6 @@ def get_classifier(algorithm, seed):
             return DecisionTreeClassifier(random_state=seed)
         case "RF":
             return RandomForestClassifier(random_state=seed, n_jobs=1)
-        case "MNB":
-            return MultinomialNB()
         case "GNB":
             return GaussianNB()
         case "SVM":
@@ -54,7 +52,7 @@ def to_dense(X):
 # The whole chain (features -> [scaling] -> classifier) is fitted on the training folds only
 # -------------------------------
 
-def build_pipeline(featureExtract, algorithm, seed):
+def feature_steps(featureExtract, algorithm, seed):
     # RoBERTa embeddings are precomputed by a frozen model: nothing to fit
     extractor = "passthrough" if featureExtract == "ROBERTA" else get_feature_extractor(featureExtract, seed)
     steps = [("features", extractor)]
@@ -62,8 +60,13 @@ def build_pipeline(featureExtract, algorithm, seed):
         steps.append(("scaler", StandardScaler()))
     if algorithm == "GNB":
         steps.append(("dense", FunctionTransformer(to_dense, accept_sparse=True)))
-    steps.append(("classifier", get_classifier(algorithm, seed)))
-    return Pipeline(steps)
+    return steps
+
+def build_features(featureExtract, algorithm, seed):
+    return Pipeline(feature_steps(featureExtract, algorithm, seed))
+
+def build_pipeline(featureExtract, algorithm, seed):
+    return Pipeline(feature_steps(featureExtract, algorithm, seed) + [("classifier", get_classifier(algorithm, seed))])
 
 # -------------------------------
 # Evaluation measures (class 0 = negative, class 1 = positive)
@@ -80,29 +83,43 @@ def evaluate(y_true, y_pred):
         "f1_pos": f1_score(y_true, y_pred, pos_label=1),
     }
 
+# Training labels: from the score, or as predicted by a lexicon labeler
+def get_train_labels(df, labels):
+    match labels:
+        case "SCORE":
+            return df["label"].values
+        case "TEXTBLOB":
+            return (df["textblob"].values > config.TEXTBLOB_THRESHOLD).astype(int)
+        case "VADER":
+            return (df["vader"].values >= config.VADER_THRESHOLD).astype(int)
+    raise ValueError("Invalid labels: " + labels)
+
 def get_folds(df, seed):
     skf = StratifiedKFold(n_splits=config.N_FOLDS, random_state=seed, shuffle=True)
     return list(skf.split(df["reviewText"], df["label"]))
 
 # -------------------------------
-# Run Experiment: one (dataset, feature, algorithm, seed) setup, 10 folds
+# Run Experiment: one (dataset, feature, algorithm, seed) setup, 10 folds.
+# The folds are always stratified by the score labels, so every training-label
+# option is evaluated on the same test folds, against the score labels
 # -------------------------------
 
-def runExperiment(dataset, featureExtract, algorithm, seed):
+def runExperiment(dataset, featureExtract, algorithm, seed, labels="SCORE"):
 
     df = load_dataset(dataset)
     X = get_roberta_embeddings(dataset) if featureExtract == "ROBERTA" else df["reviewText"].values
     y = df["label"].values
+    y_train = get_train_labels(df, labels)
 
     metrics, predictions = [], []
     for fold, (train_idx, test_idx) in enumerate(get_folds(df, seed), start=1):
         model = build_pipeline(featureExtract, algorithm, seed)
         start = time.time()
-        model.fit(X[train_idx], y[train_idx])
+        model.fit(X[train_idx], y_train[train_idx])
         y_pred = model.predict(X[test_idx])
         elapsed = time.time() - start
 
-        metrics.append({"dataset": dataset, "feature": featureExtract, "algorithm": algorithm,
+        metrics.append({"dataset": dataset, "feature": featureExtract, "algorithm": algorithm, "labels": labels,
                         "seed": seed, "fold": fold, "time": elapsed, **evaluate(y[test_idx], y_pred)})
         predictions.append(pd.DataFrame({"row": test_idx, "id": df["id"].values[test_idx], "fold": fold,
                                          "y_true": y[test_idx], "y_pred": y_pred}))

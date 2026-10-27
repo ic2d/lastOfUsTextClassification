@@ -8,8 +8,14 @@ from nltk.stem import WordNetLemmatizer
 # download nltk resources (first time only)
 # -------------------------------
 
-for resource in ["punkt", "punkt_tab", "stopwords", "wordnet", "omw-1.4"]:
-    nltk.download(resource, quiet=True)
+NLTK_RESOURCES = {"punkt": "tokenizers/punkt", "punkt_tab": "tokenizers/punkt_tab",
+                  "stopwords": "corpora/stopwords", "wordnet": "corpora/wordnet.zip", "omw-1.4": "corpora/omw-1.4.zip"}
+
+for resource, path in NLTK_RESOURCES.items():
+    try:
+        nltk.data.find(path)
+    except LookupError:
+        nltk.download(resource, quiet=True)
 
 # -------------------------------
 # Stopwords: NLTK English list without negations, which carry sentiment

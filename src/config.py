@@ -5,10 +5,10 @@ VALID_DATASETS = ["user_reviews_g1", "user_reviews_g2"]
 
 VALID_FEATURES = ["TFIDF", "BOW", "WESG", "WECBOW", "ROBERTA"]
 
-VALID_ALGORITHMS = ["KNN", "DT", "RF", "MNB", "GNB", "SVM"]
+VALID_ALGORITHMS = ["KNN", "DT", "RF", "GNB", "SVM"]
 
-# Multinomial NB requires non-negative inputs, so it only runs on count-based features
-INVALID_SETUPS = [("WESG", "MNB"), ("WECBOW", "MNB"), ("ROBERTA", "MNB")]
+# (feature, algorithm) pairs that cannot be combined (none with the current grid)
+INVALID_SETUPS = []
 
 SEEDS = list(range(1, 11))
 N_FOLDS = 10
@@ -22,6 +22,10 @@ N_FOLDS = 10
 
 POSITIVE_MIN_SCORE = 7
 NEGATIVE_MAX_SCORE = 4
+
+# Labels used to TRAIN the ML models: the score labels, or the labels a lexicon
+# would assign (to measure the cost of lexicon labels). Testing always uses the score labels.
+VALID_LABELS = ["SCORE", "TEXTBLOB", "VADER"]
 
 # Lexicon-based labelers, evaluated as baselines against the score labels
 TEXTBLOB_THRESHOLD = 0.0   # polarity > 0 -> positive
@@ -38,6 +42,11 @@ MIN_DF = 2
 EMBEDDING_SIZE = 100
 EMBEDDING_WINDOW = 5
 EMBEDDING_MIN_COUNT = 2
+
+# Hyperparameter tuning (nested CV): Bayesian optimization (TPE) with Optuna
+TUNING_TRIALS = 25
+TUNING_INNER_FOLDS = 3
+TUNING_SEEDS = [1, 2, 3]
 
 # -----------------------------------------------------------------------------------
 # Pretrained transformers (no fine-tuning), applied to the raw reviews

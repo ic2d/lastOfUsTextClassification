@@ -159,6 +159,37 @@ def error_analysis(summary, top=2):
     return pd.concat(barcode), pd.concat(by_score), pd.concat(examples)
 
 # -------------------------------
+# Cost of lexicon labels: the same setups trained with TextBlob/VADER labels
+# (results/labels_*/), all evaluated against the score labels on the same folds
+# -------------------------------
+
+def load_label_metrics(metrics):
+    frames = [metrics.loc[~metrics["feature"].isin(BASELINES)].assign(labels="SCORE")]
+    for labels in config.VALID_LABELS[1:]:
+        files = glob.glob("results/labels_" + labels.lower() + "/metrics/*.csv")
+        if files:
+            frames.append(pd.concat([pd.read_csv(f) for f in files], ignore_index=True))
+    out = pd.concat(frames, ignore_index=True)
+    out["setup"] = setup_name(out)
+    return out
+
+def label_comparison(label_metrics):
+    summary = label_metrics.groupby(["dataset", "labels", "feature", "algorithm", "setup"])[METRICS].agg(["mean", "std"])
+    summary.columns = [m + "_" + s for m, s in summary.columns]
+    summary = summary.reset_index()
+    # corrected resampled t-test: score labels vs. lexicon labels, for every setup
+    rows = []
+    for (dataset, setup), g in label_metrics.sort_values(["seed", "fold"]).groupby(["dataset", "setup"]):
+        a = g.loc[g["labels"] == "SCORE", "bac"].values
+        for labels in config.VALID_LABELS[1:]:
+            b = g.loc[g["labels"] == labels, "bac"].values
+            if len(b) == len(a):
+                t, p = corrected_ttest(a, b, config.N_FOLDS)
+                rows.append({"dataset": dataset, "setup": setup, "labels": labels,
+                             "diff": a.mean() - b.mean(), "t": t, "p_value": p})
+    return summary, pd.DataFrame(rows)
+
+# -------------------------------
 # Most discriminative terms per class: weighted log-odds ratio with an
 # informative Dirichlet prior (Monroe, Colaresi & Quinn, 2008)
 # -------------------------------
@@ -225,6 +256,15 @@ if __name__ == "__main__":
     by_score.to_csv(OUT + "errors_by_score.csv", index=False)
     examples.to_csv(OUT + "error_examples.csv", index=False)
     discriminative_terms().to_csv(OUT + "terms.csv", index=False)
+
+    label_metrics = load_label_metrics(metrics)
+    counts = label_metrics.groupby(["dataset", "labels", "setup"]).size()
+    incomplete = counts[counts != len(config.SEEDS) * config.N_FOLDS]
+    if len(incomplete):
+        print("WARNING: incomplete setups (training labels)\n", incomplete)
+    label_summary, label_tests = label_comparison(label_metrics)
+    label_summary.to_csv(OUT + "summary_labels.csv", index=False)
+    label_tests.to_csv(OUT + "labels_vs_score.csv", index=False)
 
     print(summary.groupby("dataset").head(6)[["dataset", "setup", "bac_mean", "bac_std", "f1_neg_mean"]].to_string(index=False))
     print(pd.concat(tests).to_string(index=False))
